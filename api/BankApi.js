@@ -5,9 +5,20 @@ class BankApi {
         this.baseUrl = 'https://parabank.parasoft.com/parabank';
     }
 
-    // API: Login with username and password
+    // Validate IDs before making API requests.
+    validateId(id, name) {
+        if (!/^\d+$/.test(String(id)) || Number(id) <= 0) {
+            throw new Error(`${name} must be a positive numeric ID.`);
+        }
+    }
+
+    // API: Login with username and password.
     async login(username, password) {
-        return await this.request.get(
+        if (!username || !password) {
+            throw new Error('Username and password are required.');
+        }
+
+        return this.request.get(
             `${this.baseUrl}/services/bank/login/${encodeURIComponent(username)}/${encodeURIComponent(password)}`,
             {
                 headers: {
@@ -17,9 +28,11 @@ class BankApi {
         );
     }
 
-    // API: Retrieve accounts for a customer
+    // API: Retrieve accounts for a customer.
     async getCustomerAccounts(customerId) {
-        return await this.request.get(
+        this.validateId(customerId, 'Customer ID');
+
+        return this.request.get(
             `${this.baseUrl}/services/bank/customers/${customerId}/accounts`,
             {
                 headers: {
@@ -29,9 +42,11 @@ class BankApi {
         );
     }
 
-    // API: Retrieve transactions for an account
+    // API: Retrieve transactions for an account.
     async getAccountTransactions(accountId) {
-        return await this.request.get(
+        this.validateId(accountId, 'Account ID');
+
+        return this.request.get(
             `${this.baseUrl}/services/bank/accounts/${accountId}/transactions`,
             {
                 headers: {
