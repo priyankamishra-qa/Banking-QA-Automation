@@ -28,41 +28,83 @@ class TransferPage {
         await this.transferFundsLink.click();
     }
 
-    // Wait for the account dropdowns to populate and select two accounts.
+    
+    // Wait for valid account options and select two accounts.
     async selectAccounts() {
         await this.fromAccount.waitFor({ state: 'visible' });
         await this.toAccount.waitFor({ state: 'visible' });
 
+        // Wait up to 30 seconds for real account options to load.
         await this.page.waitForFunction(() => {
-            const fromOptions = document.querySelectorAll(
-                '#fromAccountId option'
-            );
-            const toOptions = document.querySelectorAll(
-                '#toAccountId option'
-            );
+            const fromSelect = document.querySelector('#fromAccountId');
+            const toSelect = document.querySelector('#toAccountId');
 
-            return fromOptions.length >= 1 && toOptions.length >= 2;
-        }, { timeout: 10000 });
+            if (!fromSelect || !toSelect) {
+                return false;
+            }
+
+            const validAccounts = (select) =>
+                Array.from(select.options).filter(
+                    option =>
+                        option.value &&
+                        /^\d+$/.test(option.value.trim())
+                );
+
+            return (
+                validAccounts(fromSelect).length >= 1 &&
+                validAccounts(toSelect).length >= 2
+            );
+        }, { timeout: 30000 });
 
         const sourceOptions = await this.fromAccount
             .locator('option')
-            .allTextContents();
+            .evaluateAll(options =>
+                options.map(option => ({
+                    value: option.value,
+                    text: option.textContent.trim()
+                }))
+            );
 
         const destinationOptions = await this.toAccount
             .locator('option')
-            .allTextContents();
+            .evaluateAll(options =>
+                options.map(option => ({
+                    value: option.value,
+                    text: option.textContent.trim()
+                }))
+            );
 
-        console.log('Source accounts:', sourceOptions);
-        console.log('Destination accounts:', destinationOptions);
+        console.log('Source account options:', sourceOptions);
+        console.log('Destination account options:', destinationOptions);
 
-        if (sourceOptions.length < 1 || destinationOptions.length < 2) {
+        const validSource = sourceOptions.filter(
+            option => /^\d+$/.test(option.value.trim())
+        );
+
+        const validDestination = destinationOptions.filter(
+            option => /^\d+$/.test(option.value.trim())
+        );
+
+        if (validSource.length < 1 || validDestination.length < 2) {
             throw new Error(
-                'Transfer cannot proceed: ParaBank did not load enough accounts.'
+                `Insufficient account options. Source: ${JSON.stringify(sourceOptions)}; Destination: ${JSON.stringify(destinationOptions)}`
             );
         }
 
-        await this.fromAccount.selectOption({ index: 0 });
-        await this.toAccount.selectOption({ index: 1 });
+        await this.fromAccount.selectOption(validSource[0].value);
+
+        // Prefer a destination different from the source account.
+        const destination = validDestination.find(
+            option => option.value !== validSource[0].value
+        );
+
+        if (!destination) {
+            throw new Error(
+                'No destination account different from the source account was available.'
+            );
+        }
+
+        await this.toAccount.selectOption(destination.value);
     }
 
     // Enter the transfer amount.
